@@ -31,7 +31,35 @@ async function run() {
     const businessCollection = client
       .db("best_tools_parts")
       .collection("business_summary");
-    //   console.log("mongo db connected")
+    const toolCollection = client
+      .db("best_tools_parts")
+      .collection("tools");
+
+      const reviewCollection = client
+      .db("best_tools_parts")
+      .collection("review");
+
+    // tools
+    app.get("/tools", async(req, res)=> {
+        const query = {}
+        const result = await toolCollection.find(query).toArray()
+        res.send(result)
+    })
+
+    // review post
+    app.post("/reviews", async (req, res)=>{
+        const review = req.body;
+        const result = await reviewCollection.insertOne(review)
+        res.send(result)
+    })
+
+    // review get
+    app.get("/reviews", async(req, res)=>{
+        const query = {}
+        const result = await reviewCollection.find(query).toArray()
+        res.send(result)
+    })
+
 
     // business summary
     app.get("/business", async (req, res) => {
