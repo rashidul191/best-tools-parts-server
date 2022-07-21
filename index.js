@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -31,35 +31,59 @@ async function run() {
     const businessCollection = client
       .db("best_tools_parts")
       .collection("business_summary");
-    const toolCollection = client
-      .db("best_tools_parts")
-      .collection("tools");
-
-      const reviewCollection = client
-      .db("best_tools_parts")
-      .collection("review");
+    const toolCollection = client.db("best_tools_parts").collection("tools");
+    const reviewCollection = client.db("best_tools_parts").collection("review");
+    const orderCollection = client.db("best_tools_parts").collection("order");
 
     // tools
-    app.get("/tools", async(req, res)=> {
-        const query = {}
-        const result = await toolCollection.find(query).toArray()
-        res.send(result)
-    })
+    app.get("/tools", async (req, res) => {
+      const query = {};
+      const result = await toolCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // tools id
+    app.get("/tool/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await toolCollection.findOne(query);
+      res.send(result);
+    });
+
+    // update tool quantity
+    app.put("/tool/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const avaQuantity = req.body.avaQuantity;
+      const updateDoc = {
+        $set: {
+          avaQuantity: avaQuantity,
+        },
+      };
+      const result = await toolCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    // order summary post
+    app.post("/order", async (req, res) => {
+      const order = req.body;
+      const result = await orderCollection.insertOne(order);
+      res.send(result);
+    });
 
     // review post
-    app.post("/reviews", async (req, res)=>{
-        const review = req.body;
-        const result = await reviewCollection.insertOne(review)
-        res.send(result)
-    })
+    app.post("/reviews", async (req, res) => {
+      const review = req.body;
+      const result = await reviewCollection.insertOne(review);
+      res.send(result);
+    });
 
     // review get
-    app.get("/reviews", async(req, res)=>{
-        const query = {}
-        const result = await reviewCollection.find(query).toArray()
-        res.send(result)
-    })
-
+    app.get("/reviews", async (req, res) => {
+      const query = {};
+      const result = await reviewCollection.find(query).toArray();
+      res.send(result);
+    });
 
     // business summary
     app.get("/business", async (req, res) => {
