@@ -3,6 +3,7 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -22,12 +23,10 @@ const client = new MongoClient(uri, {
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
-
   if (!authHeader) {
     return res.status(401).send({ message: "UnAuthorized access" });
   }
   const token = authHeader.split(" ")[1];
-  // console.log(token)
   jwt.verify(
     token,
     process.env.ACCESS_TOKEN_SECRET_KEY,
@@ -36,7 +35,6 @@ function verifyJWT(req, res, next) {
         return res.status(403).send({ message: "Forbidden access" });
       }
       req.decoded = decoded;
-
       next();
     }
   );
@@ -53,6 +51,34 @@ async function run() {
     const toolCollection = client.db("best_tools_parts").collection("tools");
     const reviewCollection = client.db("best_tools_parts").collection("review");
     const orderCollection = client.db("best_tools_parts").collection("order");
+    const paymentCollection = client
+      .db("best_tools_parts")
+      .collection("payments");
+
+    const verifyAdmin = async (req, res, next) => {
+      const requester = req.decoded.userEmail;
+      const requesterAccount = await userCollection.findOne({
+        userEmail: requester,
+      });
+      if (requesterAccount.role === "admin") {
+        next();
+      } else {
+        res.status(403).send({ message: "forbidden" });
+      }
+    };
+
+    // user payment-intent
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const tools = req.body;
+      const pricePerUnit = tools.toolPrice;
+      const amount = pricePerUnit * 1000;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({ clientSecret: paymentIntent.client_secret });
+    });
 
     // all users show ui on admin page
     app.get("/users", verifyJWT, async (req, res) => {
@@ -93,7 +119,6 @@ async function run() {
     // user Make a admin api
     app.put("/user/admin/:email", verifyJWT, async (req, res) => {
       const userEmail = req.params.email;
-
       // if a admin
       const requester = req.decoded.userEmail;
       const requesterAccount = await userCollection.findOne({
@@ -106,9 +131,8 @@ async function run() {
         };
         const result = await userCollection.updateOne(filter, updateDoc);
         res.send(result);
-      }
-      else{
-        res.status(403).send({message: "forbidden"})
+      } else {
+        res.status(403).send({ message: "forbidden" });
       }
     });
 
@@ -127,7 +151,6 @@ async function run() {
       res.send(result);
     });
 
-
     // update tool quantity
     app.put("/tool/:id", async (req, res) => {
       const id = req.params.id;
@@ -142,14 +165,20 @@ async function run() {
       res.send(result);
     });
 
-
     // tool post in api
-    app.post("/tool",verifyJWT, async(req, res)=>{
+    app.post("/tool", verifyJWT, verifyAdmin, async (req, res) => {
       const tool = req.body;
-      const result = await toolCollection.insertOne(tool)
-      res.send(result)
-    })
+      const result = await toolCollection.insertOne(tool);
+      res.send(result);
+    });
 
+    // delete tools id
+    app.delete("/tool/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await toolCollection.deleteOne(filter);
+      res.send(result);
+    });
 
     // review post
     app.post("/reviews", async (req, res) => {
@@ -184,6 +213,39 @@ async function run() {
       } else {
         return res.status(403).send({ message: "forbidden access" });
       }
+    });
+
+    // get order id
+    app.get("/order/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await orderCollection.findOne(filter);
+      res.send(result);
+    });
+
+    // update order after user payment
+    app.patch("/order/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const payment = req.body;
+      const filter = { _id: ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId,
+        },
+      };
+
+      const result = await paymentCollection.insertOne(payment);
+      const updateOrder = await orderCollection.updateOne(filter, updateDoc);
+      res.send(updateDoc);
+    });
+
+    // delete order id
+    app.delete("/order/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await orderCollection.deleteOne(filter);
+      res.send(result);
     });
 
     // business summary
