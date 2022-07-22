@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
@@ -17,6 +17,30 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
+
+// verify token
+
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send({ message: "UnAuthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  // console.log(token)
+  jwt.verify(
+    token,
+    process.env.ACCESS_TOKEN_SECRET_KEY,
+    function (err, decoded) {
+      if (err) {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      req.decoded = decoded;
+
+      next();
+    }
+  );
+}
 
 // run function
 async function run() {
@@ -40,7 +64,14 @@ async function run() {
         $set: user,
       };
       const result = await userCollection.updateOne(filter, updateDoc, options);
-      res.send(result);
+      const token = jwt.sign(
+        {
+          userEmail: userEmail,
+        },
+        process.env.ACCESS_TOKEN_SECRET_KEY,
+        { expiresIn: "1d" }
+      );
+      res.send({ result, token });
     });
 
     // tools
@@ -94,11 +125,17 @@ async function run() {
     });
 
     // order summary get user email
-    app.get("/orders", async (req, res) => {
+    app.get("/orders", verifyJWT, async (req, res) => {
       const userEmail = req.query.userEmail;
-      const query = { userEmail: userEmail };
-      const result = await orderCollection.find(query).toArray();
-      res.send(result);
+      // here access verifyJWT token
+      const decodedEmail = req.decoded.userEmail;
+      if (userEmail === decodedEmail) {
+        const query = { userEmail: userEmail };
+        const result = await orderCollection.find(query).toArray();
+        return res.send(result);
+      } else {
+        return res.status(403).send({ message: "forbidden access" });
+      }
     });
 
     // business summary
