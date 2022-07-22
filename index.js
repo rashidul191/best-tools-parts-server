@@ -74,6 +74,25 @@ async function run() {
       res.send({ result, token });
     });
 
+    // user Make a admin api
+    app.put("/user/admin/:email", async (req, res) => {
+      const userEmail = req.params.email;
+
+      const filter = { userEmail: userEmail };
+      const updateDoc = {
+        $set: { role: "admin" },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    // all users show ui on admin page
+    app.get("/users", verifyJWT, async (req, res) => {
+      const query = {};
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // tools
     app.get("/tools", async (req, res) => {
       const query = {};
