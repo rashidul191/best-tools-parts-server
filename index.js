@@ -54,6 +54,13 @@ async function run() {
     const reviewCollection = client.db("best_tools_parts").collection("review");
     const orderCollection = client.db("best_tools_parts").collection("order");
 
+    // all users show ui on admin page
+    app.get("/users", verifyJWT, async (req, res) => {
+      const query = {};
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // user info put api
     app.put("/user/:email", async (req, res) => {
       const userEmail = req.params.email;
@@ -74,23 +81,35 @@ async function run() {
       res.send({ result, token });
     });
 
-    // user Make a admin api
-    app.put("/user/admin/:email", async (req, res) => {
+    // get admin
+    app.get("/admin/:email", async (req, res) => {
       const userEmail = req.params.email;
-
-      const filter = { userEmail: userEmail };
-      const updateDoc = {
-        $set: { role: "admin" },
-      };
-      const result = await userCollection.updateOne(filter, updateDoc);
-      res.send(result);
+      const query = { userEmail: userEmail };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user.role === "admin";
+      res.send({ admin: isAdmin });
     });
 
-    // all users show ui on admin page
-    app.get("/users", verifyJWT, async (req, res) => {
-      const query = {};
-      const result = await userCollection.find(query).toArray();
-      res.send(result);
+    // user Make a admin api
+    app.put("/user/admin/:email", verifyJWT, async (req, res) => {
+      const userEmail = req.params.email;
+
+      // if a admin
+      const requester = req.decoded.userEmail;
+      const requesterAccount = await userCollection.findOne({
+        userEmail: requester,
+      });
+      if (requesterAccount.role === "admin") {
+        const filter = { userEmail: userEmail };
+        const updateDoc = {
+          $set: { role: "admin" },
+        };
+        const result = await userCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+      else{
+        res.status(403).send({message: "forbidden"})
+      }
     });
 
     // tools
@@ -108,6 +127,7 @@ async function run() {
       res.send(result);
     });
 
+
     // update tool quantity
     app.put("/tool/:id", async (req, res) => {
       const id = req.params.id;
@@ -121,6 +141,15 @@ async function run() {
       const result = await toolCollection.updateOne(query, updateDoc);
       res.send(result);
     });
+
+
+    // tool post in api
+    app.post("/tool",verifyJWT, async(req, res)=>{
+      const tool = req.body;
+      const result = await toolCollection.insertOne(tool)
+      res.send(result)
+    })
+
 
     // review post
     app.post("/reviews", async (req, res) => {
