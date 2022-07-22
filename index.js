@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
@@ -24,9 +25,23 @@ async function run() {
     const businessCollection = client
       .db("best_tools_parts")
       .collection("business_summary");
+    const userCollection = client.db("best_tools_parts").collection("users");
     const toolCollection = client.db("best_tools_parts").collection("tools");
     const reviewCollection = client.db("best_tools_parts").collection("review");
     const orderCollection = client.db("best_tools_parts").collection("order");
+
+    // user info put api
+    app.put("/user/:email", async (req, res) => {
+      const userEmail = req.params.email;
+      const user = req.body;
+      const filter = { userEmail: userEmail };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
+    });
 
     // tools
     app.get("/tools", async (req, res) => {
@@ -57,21 +72,6 @@ async function run() {
       res.send(result);
     });
 
-    // order summary post
-    app.post("/order", async (req, res) => {
-      const order = req.body;
-      const result = await orderCollection.insertOne(order);
-      res.send(result);
-    });
-
-    // order summary get user email
-    app.get("/orders", async(req,res)=>{
-      const userEmail = req.query.userEmail
-      const query ={userEmail: userEmail};
-      const result = await orderCollection.find(query).toArray()
-      res.send(result)
-    })
-
     // review post
     app.post("/reviews", async (req, res) => {
       const review = req.body;
@@ -83,6 +83,21 @@ async function run() {
     app.get("/reviews", async (req, res) => {
       const query = {};
       const result = await reviewCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // order summary post
+    app.post("/order", async (req, res) => {
+      const order = req.body;
+      const result = await orderCollection.insertOne(order);
+      res.send(result);
+    });
+
+    // order summary get user email
+    app.get("/orders", async (req, res) => {
+      const userEmail = req.query.userEmail;
+      const query = { userEmail: userEmail };
+      const result = await orderCollection.find(query).toArray();
       res.send(result);
     });
 
