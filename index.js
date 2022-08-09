@@ -20,7 +20,6 @@ const client = new MongoClient(uri, {
 });
 
 // verify token
-
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -55,6 +54,7 @@ async function run() {
       .db("best_tools_parts")
       .collection("payments");
 
+    //verify admin
     const verifyAdmin = async (req, res, next) => {
       const requester = req.decoded.userEmail;
       const requesterAccount = await userCollection.findOne({
@@ -81,7 +81,7 @@ async function run() {
     });
 
     // all users show ui on admin page
-    app.get("/users", verifyJWT, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const query = {};
       const result = await userCollection.find(query).toArray();
       res.send(result);
